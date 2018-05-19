@@ -1,0 +1,42 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Elasticsearch ECS Host Autoscaling Group'
+
+Parameters:
+  Environment:
+    Description: Environment to deploy. Use staging for limited resources and no alerts.
+    Type: String
+    Default: Staging
+    AllowedValues:
+    - Staging
+    - Production
+  EcsAmi:
+    Description: AMI ID
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ecs/optimized-ami/amazon-linux/recommended/image_id
+  KeyName:
+    Description: SSH Key Name
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 50
+            VolumeType: gp2
+            DeleteOnTermination: true
+        - DeviceName: "/dev/sdf"
+          Ebs:
+            VolumeSize: 100
+            VolumeType: gp2
+            DeleteOnTermination: true
+
+      EbsOptimized: True
+      ImageId: !Ref EcsAmi
+      InstanceMonitoring: true
+      InstanceType: t2.large
+      KeyName: !Ref KeyName
