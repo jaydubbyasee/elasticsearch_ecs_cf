@@ -1,0 +1,79 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Elasticsearch security groups'
+
+Parameters:
+
+  Vpc:
+    Description: The Arn of the Vpc where the security groups will be created.
+    Type: AWS::EC2::VPC::Id
+
+  Environment:
+    Description: Environment to deploy. Use staging for limited resources and no alerts.
+    Type: String
+    Default: Staging
+    AllowedValues:
+    - Staging
+    - Production
+
+  TrustedIp:
+    Description: Trusted IP to connect from
+    Type: String
+
+
+Resources:
+  
+  ElasticsearchSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties: 
+      GroupName: ElasticsearchSecurityGroup
+      GroupDescription: String
+      VpcId: !Ref Vpc
+  
+  EsClusterRestIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties: 
+      Description: Elasticsearch Cluster REST Ingress
+      IpProtocol: tcp
+      GroupId: !Ref ElasticsearchSecurityGroup
+      SourceSecurityGroupId: !Ref ElasticsearchSecurityGroup
+      FromPort: 9200
+      ToPort: 9200
+  
+  EsClusterTransportIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      Description: Elasticsearch Cluster Transport Ingress
+      IpProtocol: tcp
+      GroupId: !Ref ElasticsearchSecurityGroup
+      SourceSecurityGroupId: !Ref ElasticsearchSecurityGroup
+      FromPort: 9300
+      ToPort: 9300
+
+  EsClusterSSH:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties: 
+      Description: Elasticsearch Cluster REST Ingress
+      GroupId: !Ref ElasticsearchSecurityGroup
+      IpProtocol: tcp
+      CidrIp: 208.18.84.1/32
+      FromPort: 22
+      ToPort: 22
+
+  KibanaSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties: 
+      GroupName: KibanaSecurityGroup
+      GroupDescription: String
+      VpcId: !Ref Vpc
+
+  KibanaRestIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties: 
+      Description: Kibana REST Ingress
+      IpProtocol: tcp
+      GroupId: !Ref KibanaSecurityGroup
+      IpProtocol: tcp
+      CidrIp: !Ref TrustedIp
+      FromPort: 5601
+      ToPort: 5601
