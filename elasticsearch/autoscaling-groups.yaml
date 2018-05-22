@@ -14,29 +14,74 @@ Parameters:
     Description: AMI ID
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ecs/optimized-ami/amazon-linux/recommended/image_id
+  EcsCluster:
+    Description: ECS Cluster Name
+    Type: String
   KeyName:
     Description: SSH Key Name
     Type: AWS::EC2::KeyPair::KeyName
+  SecurityGroup:
+    Description: ECS Instance Security Group
+    Type: AWS::EC2::SecurityGroup::Id
 
 Resources:
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ${EnvironmentName}-ECSRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+
+      Policies:
+        - PolicyName: ecs-service
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:CreateCluster
+                  - ecs:DeregisterContainerInstance
+                  - ecs:DiscoverPollEndpoint
+                  - ecs:Poll
+                  - ecs:RegisterContainerInstance
+                  - ecs:StartTelemetrySession
+                  - ecs:Submit*
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
   LaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
+
     Properties:
       AssociatePublicIpAddress: true
       BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-            VolumeSize: 50
-            VolumeType: gp2
-            DeleteOnTermination: true
-        - DeviceName: "/dev/sdf"
+        - DeviceName: "/dev/xvdcz"
           Ebs:
             VolumeSize: 100
             VolumeType: gp2
             DeleteOnTermination: true
-
-      EbsOptimized: True
+      EbsOptimized: False
       ImageId: !Ref EcsAmi
       InstanceMonitoring: true
       InstanceType: t2.large
       KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref SecurityGroup
+
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
