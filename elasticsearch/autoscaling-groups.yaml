@@ -23,46 +23,43 @@ Parameters:
   SecurityGroup:
     Description: ECS Instance Security Group
     Type: AWS::EC2::SecurityGroup::Id
+  AvailabilityZones:
+    Description: Availability Zones
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  Subnets:
+    Description: Subnets
+    Type: List<AWS::EC2::Subnet::Id>
+  InstanceCount:
+    Description: Number of instances to maintain
+    Type: String
 
 Resources:
 
-  ECSRole:
-    Type: AWS::IAM::Role
+  ECSCluster:
+    Type: AWS::ECS::Cluster
     Properties:
-      Path: /
-      RoleName: !Sub ${EnvironmentName}-ECSRole-${AWS::Region}
-      AssumeRolePolicyDocument:
-        Version: "2008-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: "ec2.amazonaws.com"
-            Action: "sts:AssumeRole"
+      ClusterName: !Ref EcsCluster
 
-      Policies:
-        - PolicyName: ecs-service
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ecs:CreateCluster
-                  - ecs:DeregisterContainerInstance
-                  - ecs:DiscoverPollEndpoint
-                  - ecs:Poll
-                  - ecs:RegisterContainerInstance
-                  - ecs:StartTelemetrySession
-                  - ecs:Submit*
-                  - ecr:GetAuthorizationToken
-                  - ecr:BatchCheckLayerAvailability
-                  - ecr:GetDownloadUrlForLayer
-                  - ecr:BatchGetImage
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "*"
+  AutoscalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${Environment}-ecs-asg # Update requires: Replacement
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      AvailabilityZones: !Ref AvailabilityZones         # Update requires: No Interruption
+      DesiredCapacity: !Ref InstanceCount               # Update requires: No interruption
+      MinSize: !Ref InstanceCount                       # Update requires: No interruption
+      MaxSize: !Ref InstanceCount                       # Update requires: No interruption
+      Cooldown: 600                                     # Update requires: No interruption
+      HealthCheckGracePeriod: 30                        # Update requires: No interruption
+      HealthCheckType: EC2                              # Update requires: No interruption
+      Tags:
+        - Key: elasticsearch-cluster
+          Value: !Ref EcsCluster # TODO: Change this to something more sensible
+          PropagateAtLaunch: true
+      VPCZoneIdentifier: !Ref Subnets
 
   LaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
-
     Properties:
       AssociatePublicIpAddress: true
       BlockDeviceMappings:
@@ -85,3 +82,36 @@ Resources:
           commands:
             01_add_instance_to_cluster:
               command: !Sub echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ${Environment}-ECSRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: ecs-service
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:CreateCluster
+                  - ecs:DeregisterContainerInstance
+                  - ecs:DiscoverPollEndpoint
+                  - ecs:Poll
+                  - ecs:RegisterContainerInstance
+                  - ecs:StartTelemetrySession
+                  - ecs:Submit*
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
